@@ -1,0 +1,29 @@
+# 忽略构建相关的文件夹
+main.build/
+main.dist/
+main.onefile-build/
+
+# 忽略二进制可执行文件
+*.exe
+
+# 忽略视频数据集和大型文件
+*.mp4
+*.avi
+*.mkv
+*.mov
+
+# 忽略系统生成的文件
+Thumbs.db
+.DS_Store
+
+# 忽略 Conda 环境文件夹（如果有）
+env/
+.conda/
+
+# 忽略 IDE/编辑器生成的配置文件
+.vscode/
+.idea/
+
+# 忽略 Python 编译的字节码文件
+__pycache__/
+*.py[cod]

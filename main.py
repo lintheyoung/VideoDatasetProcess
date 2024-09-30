@@ -20,6 +20,7 @@ from skimage import exposure
 import xml.dom.minidom as DOC
 
 import datetime
+import sys  # 添加sys模块以重定向stdout
 
 def generate_timestamp():
     return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -49,68 +50,105 @@ def parse_xml(xml_path):
 ctk.set_appearance_mode("System")  # System theme
 ctk.set_default_color_theme("blue")  # Blue theme
 
+class TextRedirector:
+    def __init__(self, widget):
+        self.widget = widget
+
+    def write(self, message):
+        self.widget.insert(ctk.END, message)
+        self.widget.see(ctk.END)  # 自动滚动到末尾
+        self.widget.update_idletasks()  # 更新文本框
+
+    def flush(self):
+        pass
+
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title('DeDeMaker视频数据处理-V1.0')
-        self.geometry('600x700')  # Increased height to accommodate all sections
+        self.title('Video2Tag视频数据处理-V1.0')
+        self.geometry('600x560')  # Increased height to accommodate output textbox
 
-        # 添加DeDeMaker图标和点击事件
-        self.label_dedemaker = ctk.CTkLabel(self, text="DeDeMaker.com", font=("微软雅黑", 15), cursor="hand2")
-        self.label_dedemaker.place(x=10, y=10)  # 根据需要调整位置
-        self.label_dedemaker.bind("<Button-1>", lambda e: webbrowser.open("http://dedemaker.com"))
+        # 添加Video2Tag图标和点击事件
+        self.label_video2tag = ctk.CTkLabel(self, text="video2tag.com", font=("微软雅黑", 15), cursor="hand2")
+        self.label_video2tag.place(x=10, y=10)  # 根据需要调整位置
+        self.label_video2tag.bind("<Button-1>", lambda e: webbrowser.open("https://video2tag.com"))
 
         # 视频处理部分
         self.label_video_processing = ctk.CTkLabel(self, text="1、视频处理", font=("微软雅黑", 12))
         self.label_video_processing.pack(pady=(10, 0))
-        
+
         self.frame_video_processing = ctk.CTkFrame(self)
-        self.frame_video_processing.pack(pady=5)
-        
-        self.btn_select_input_video = ctk.CTkButton(self.frame_video_processing, text="选择输入视频", font=("微软雅黑", 12), command=self.select_input_video)
-        self.btn_select_input_video.grid(row=0, column=0, padx=10, pady=10)
-        
-        self.btn_select_output_folder_video = ctk.CTkButton(self.frame_video_processing, text="选择输出文件夹", font=("微软雅黑", 12), command=self.select_output_folder_video)
-        self.btn_select_output_folder_video.grid(row=0, column=1, padx=10, pady=10)
-        
-        self.btn_start_video = ctk.CTkButton(self.frame_video_processing, text="开始", font=("微软雅黑", 12), command=self.start_video_compression)
-        self.btn_start_video.grid(row=0, column=2, padx=10, pady=10)
+        self.frame_video_processing.pack(pady=5, fill='x')
+
+        # 创建按钮框架并居中
+        self.btn_frame = ctk.CTkFrame(self.frame_video_processing)
+        self.btn_frame.pack(pady=5, anchor='center')
+
+        self.btn_select_input_video = ctk.CTkButton(self.btn_frame, text="选择输入视频", font=("微软雅黑", 12), command=self.select_input_video)
+        self.btn_select_input_video.pack(side='left', padx=10, pady=10)
+
+        self.btn_select_output_folder_video = ctk.CTkButton(self.btn_frame, text="选择输出文件夹", font=("微软雅黑", 12), command=self.select_output_folder_video)
+        self.btn_select_output_folder_video.pack(side='left', padx=10, pady=10)
+
+        self.btn_start_video = ctk.CTkButton(self.btn_frame, text="开始", font=("微软雅黑", 12), command=self.start_video_compression)
+        self.btn_start_video.pack(side='left', padx=10, pady=10)
+
+        # 创建选项框架并居中
+        self.options_frame = ctk.CTkFrame(self.frame_video_processing)
+        self.options_frame.pack(pady=5, anchor='center')
+
+        self.label_output_size = ctk.CTkLabel(self.options_frame, text="输出尺寸", font=("微软雅黑", 12))
+        self.label_output_size.pack(side='left', padx=10, pady=10)
+
+        self.option_output_size = ctk.CTkOptionMenu(self.options_frame, values=["480P", "720P", "1080P"], font=("微软雅黑", 12))
+        self.option_output_size.pack(side='left', padx=10, pady=10)
+        self.option_output_size.set("720P")  # 设置默认值
+
+        self.label_fps = ctk.CTkLabel(self.options_frame, text="帧率", font=("微软雅黑", 12))
+        self.label_fps.pack(side='left', padx=10, pady=10)
+
+        self.entry_fps = ctk.CTkEntry(self.options_frame, font=("微软雅黑", 12))
+        self.entry_fps.pack(side='left', padx=10, pady=10)
+        self.entry_fps.insert(0, "10")  # 设置默认值
 
         # 数据集合并部分
         self.label_dataset_merge = ctk.CTkLabel(self, text="2、合并数据集", font=("微软雅黑", 12))
         self.label_dataset_merge.pack(pady=(10, 0))
-        
+
         self.frame_dataset_merge = ctk.CTkFrame(self)
         self.frame_dataset_merge.pack(pady=5)
-        
+
         self.btn_select_files = ctk.CTkButton(self.frame_dataset_merge, text="选择文件夹", font=("微软雅黑", 12), command=self.select_files)
         self.btn_select_files.grid(row=0, column=0, padx=10, pady=10)
-        
+
         self.btn_select_output_folder_dataset = ctk.CTkButton(self.frame_dataset_merge, text="选择输出文件夹", font=("微软雅黑", 12), command=self.select_output_folder_dataset)
         self.btn_select_output_folder_dataset.grid(row=0, column=1, padx=10, pady=10)
-        
+
         self.btn_start_dataset = ctk.CTkButton(self.frame_dataset_merge, text="开始", font=("微软雅黑", 12), command=self.start_dataset_merge)
         self.btn_start_dataset.grid(row=0, column=2, padx=10, pady=10)
 
         # 数据集增强部分
         self.label_dataset_aug = ctk.CTkLabel(self, text="3、数据集增强", font=("微软雅黑", 12))
         self.label_dataset_aug.pack(pady=(10, 0))
-        
+
         self.frame_dataset_aug = ctk.CTkFrame(self)
         self.frame_dataset_aug.pack(pady=5)
-        
+
         self.btn_select_files_aug = ctk.CTkButton(self.frame_dataset_aug, text="选择zip文件", font=("微软雅黑", 12), command=self.select_files_aug)
         self.btn_select_files_aug.grid(row=0, column=0, padx=10, pady=10)
-        
+
         self.btn_select_output_folder_dataset_aug = ctk.CTkButton(self.frame_dataset_aug, text="选择输出文件夹", font=("微软雅黑", 12), command=self.select_output_folder_dataset_aug)
         self.btn_select_output_folder_dataset_aug.grid(row=0, column=1, padx=10, pady=10)
-        
+
         self.btn_start_dataset_aug = ctk.CTkButton(self.frame_dataset_aug, text="开始", font=("微软雅黑", 12), command=self.start_dataset_aug)
         self.btn_start_dataset_aug.grid(row=0, column=2, padx=10, pady=10)
 
-        # 进度条显示（可选）
-        self.progress_label = ctk.CTkLabel(self, text="", font=("微软雅黑", 10))
-        self.progress_label.pack(pady=(10, 0))
+        # 输出显示框
+        self.output_textbox = ctk.CTkTextbox(self, width=680, height=200, font=("微软雅黑", 10))
+        self.output_textbox.pack(pady=(10, 0))
+
+        # 重定向stdout到输出显示框
+        sys.stdout = TextRedirector(self.output_textbox)
 
         # Attributes for video processing
         self.input_video_path = ''
@@ -125,7 +163,7 @@ class App(ctk.CTk):
         self.output_dataset_folder_aug = ''
 
     def select_input_video(self):
-        self.input_video_path = filedialog.askopenfilename(title="选择输入视频文件", filetypes=(("MP4 files", "*.mp4"),))
+        self.input_video_path = filedialog.askopenfilename(title="选择输入视频文件", filetypes=(("视频文件", "*.mp4;*.avi;*.mov;*.mkv"),))
 
     def select_output_folder_video(self):
         self.output_video_folder = filedialog.askdirectory(title="选择输出文件夹")
@@ -135,15 +173,30 @@ class App(ctk.CTk):
             timestamp = generate_timestamp()  # 获取时间戳
             output_video_path = os.path.join(self.output_video_folder, f"compressed_video_{timestamp}.mp4")  # 文件名中加入时间戳
 
-            compress_video(self.input_video_path, output_video_path)
-            messagebox.showinfo("完成", "视频处理完成！")
+            output_size = self.option_output_size.get()
+            fps_value = self.entry_fps.get()
+            try:
+                fps_value = int(fps_value)
+                if fps_value <= 0:
+                    raise ValueError
+            except ValueError:
+                messagebox.showwarning("警告", "请输入有效的帧率！")
+                return
+
+            try:
+                print("开始视频压缩...")
+                compress_video(self.input_video_path, output_video_path, output_size, fps_value)
+                print("视频处理完成！")
+                messagebox.showinfo("完成", "视频处理完成！")
+            except Exception as e:
+                messagebox.showerror("错误", f"视频处理失败：{str(e)}")
         else:
             messagebox.showwarning("警告", "请选择输入视频和输出文件夹！")
 
     def select_files(self):
         self.files_to_merge = filedialog.askdirectory(title="选择文件夹")  # 让用户选择一个文件夹
         if self.files_to_merge:
-            print(f"Selected folder: {self.files_to_merge}")  # 打印所选文件夹路径，可根据需要删除此行
+            print(f"Selected folder: {self.files_to_merge}")  # 打印所选文件夹路径
 
     def select_output_folder_dataset(self):
         self.output_dataset_folder = filedialog.askdirectory(title="选择输出文件夹")
@@ -169,14 +222,13 @@ class App(ctk.CTk):
                 # 删除merged文件夹及其所有内容
                 shutil.rmtree(merged_path)
 
-                print(output_zip)
+                print(f"合并后的数据集已压缩到: {output_zip}")
 
                 messagebox.showinfo("完成", "数据集合并并压缩完成！")
         else:
             messagebox.showwarning("警告", "请选择数据集文件夹和输出文件夹！")
 
     def select_files_aug(self):
-        # 使用filedialog.askopenfilename替换askdirectory
         self.files_to_aug = filedialog.askopenfilename(title="选择ZIP文件", filetypes=(("ZIP files", "*.zip"),))
         if self.files_to_aug:
             print(f"Selected ZIP file: {self.files_to_aug}")  # 打印所选ZIP文件路径
@@ -190,6 +242,8 @@ class App(ctk.CTk):
                 base_path = self.files_to_aug
                 # unzip_datasets_and_process now handles augmentation
                 augmented_zip_path = unzip_datasets_and_process(base_path, self.output_dataset_folder_aug)
+
+                print(f"增强后的数据集已压缩到: {augmented_zip_path}")
 
                 messagebox.showinfo("完成", "数据增强完成！")
         else:
@@ -605,7 +659,11 @@ def data_augmentation(extract_folder, custom_tag):
 
     dataAug = DataAugmentForObjectDetection()  # 使用你的数据增强类
 
-    for file in os.listdir(source_pic_root_path):
+    file_list = os.listdir(source_pic_root_path)
+    total_files = len(file_list)
+    processed_files = 0
+
+    for file in file_list:
         if file.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
             pic_path = os.path.join(source_pic_root_path, file)
             xml_path = os.path.join(source_xml_root_path, os.path.splitext(file)[0] + '.xml')
@@ -634,6 +692,12 @@ def data_augmentation(extract_folder, custom_tag):
             # 生成和保存增强后的XML
             new_xml_name = os.path.splitext(new_file_name)[0] + '.xml'
             generate_new_xml(aug_bboxes, saved_xml_root_path, new_xml_name, xml_path)
+
+            processed_files += 1
+            progress = (processed_files / total_files) * 100
+            print(f"Data Augmentation Progress: {progress:.2f}%")
+    
+    print("数据增强完成！")
 
     # 打包处理过的文件夹，准备下载
     timestamp = generate_timestamp()  # 获取时间戳
@@ -714,25 +778,48 @@ def unzip_datasets_and_process(zip_file_path, output_dir):
     return None
 
 # 定义压缩视频的函数
-def compress_video(input_video_path, output_video_path, max_height=320, fps=10):
-    # 加载视频
+def compress_video(input_video_path, output_video_path, output_size, fps):
+    # Map output_size to desired resolution for the longer side
+    if output_size == "480P":
+        max_length = 480
+    elif output_size == "720P":
+        max_length = 720
+    elif output_size == "1080P":
+        max_length = 1080
+    else:
+        max_length = 720  # Default
+
+    # Load video
     video = VideoFileClip(input_video_path)
-    
-    # 计算新的宽度保持纵横比
-    aspect_ratio = video.w / video.h
-    new_height = max_height
-    new_width = int(new_height * aspect_ratio)
-    
-    # 如果计算出的新宽度大于原视频宽度，使用原视频的尺寸
-    if new_width > video.w:
-        new_width = video.w
-        new_height = video.h
-    
-    # 调整视频分辨率和帧率
-    video = video.resize(height=new_height, width=new_width).set_fps(fps)
-    
-    # 保存视频
+    # Get original dimensions
+    orig_width, orig_height = video.w, video.h
+
+    # Determine if video is landscape or portrait
+    is_landscape = orig_width >= orig_height
+
+    if is_landscape:
+        # For landscape, width is the longer side
+        new_width = max_length
+        new_height = int(orig_height * (new_width / orig_width))
+    else:
+        # For portrait, height is the longer side
+        new_height = max_length
+        new_width = int(orig_width * (new_height / orig_height))
+
+    # If calculated dimensions exceed original dimensions, use original dimensions
+    if new_width > orig_width or new_height > orig_height:
+        new_width = orig_width
+        new_height = orig_height
+
+    print(f"Original size: {orig_width}x{orig_height}")
+    print(f"New size: {new_width}x{new_height}")
+
+    # Resize video and set fps
+    video = video.resize(newsize=(new_width, new_height)).set_fps(fps)
+
+    # Save video
     video.write_videofile(output_video_path, codec='libx264', audio_codec='aac')
+    print("视频压缩完成。")
 
 # 步骤1：解压ZIP文件到临时文件夹
 def unzip_datasets(base_path, temp_dir):
@@ -751,7 +838,7 @@ def merge_voc_datasets(base_path, custom_tag, output_path):
     global progress
     progress = 0
     categories = [d for d in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, d))]
-    print(categories)
+    print(f"Categories found: {categories}")
     
     # 使用output_path参数来指定合并后的输出目录
     merged_xml_dir = os.path.join(output_path, 'merged', 'xml')
@@ -795,8 +882,7 @@ def merge_voc_datasets(base_path, custom_tag, output_path):
             print(f"Warning: Annotation directory {annotation_dir} does not exist. Skipping category.")
             continue
         files = os.listdir(annotation_dir)
-        for file in files:
-            print(f"Processing file: {file}")  # 打印文件名
+        print(f"Files in category '{category}': {files}")  # 打印文件名
         # 过滤掉无法提取帧编号的文件
         sorted_files = sorted(files, key=lambda x: extract_number(x) if extract_number(x) is not None else -1)
         category_files.append(sorted_files)
@@ -838,9 +924,9 @@ def merge_voc_datasets(base_path, custom_tag, output_path):
 
         processed_files += 1
         progress = (processed_files / total_files) * 100
-        print(f"Progress: {progress:.2f}%")
+        print(f"Merging Progress: {progress:.2f}%")
 
-    print("Merging Complete!")
+    print("数据集合并完成！")
 
 # 步骤3：将合并后的文件夹压缩为ZIP文件
 def zip_merged_dataset(merged_path, output_zip):
@@ -851,6 +937,7 @@ def zip_merged_dataset(merged_path, output_zip):
                 # 计算file_path相对于merged_path的相对路径
                 relative_path = os.path.relpath(file_path, merged_path)
                 zipf.write(file_path, relative_path)
+    print(f"合并后的数据集已压缩到: {output_zip}")
 
 def print_dir_tree(startpath, max_depth=1):
     for root, dirs, files in os.walk(startpath):
